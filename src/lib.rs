@@ -16,6 +16,8 @@ extern crate dbus;
 
 extern crate ascii;
 
+extern crate eui48;
+
 pub mod errors;
 
 mod dbus_nm;

@@ -133,6 +133,10 @@ impl Connection {
             Ok(vec![])
         }
     }
+
+    pub fn set_mac_address(&self, mac_address: &str) -> Result<()> {
+        self.dbus_manager.set_connection_mac_address(&self.path, mac_address)
+    }
 }
 
 impl Ord for Connection {
@@ -184,6 +188,7 @@ pub struct ConnectionSettings {
     pub uuid: String,
     pub ssid: Ssid,
     pub mode: String,
+    pub mac_address: String,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -195,8 +200,8 @@ pub enum ConnectionState {
     Deactivated = 4,
 }
 
-impl From<i64> for ConnectionState {
-    fn from(state: i64) -> Self {
+impl From<u32> for ConnectionState {
+    fn from(state: u32) -> Self {
         match state {
             0 => ConnectionState::Unknown,
             1 => ConnectionState::Activating,
@@ -208,6 +213,12 @@ impl From<i64> for ConnectionState {
                 ConnectionState::Unknown
             },
         }
+    }
+}
+
+impl<'b> dbus::arg::Get<'b> for ConnectionState {
+    fn get(i: &mut dbus::arg::Iter<'b>) -> Option<Self> {
+        i.read::<u32>().map(|v| ConnectionState::from(v)).ok()
     }
 }
 
@@ -371,6 +382,7 @@ mod tests {
             ),
         };
 
+println!("{:?}", connection.settings());
         let state = connection.get_state().unwrap();
 
         if state == ConnectionState::Activated {

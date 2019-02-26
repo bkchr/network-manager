@@ -7,12 +7,14 @@ use dbus::arg::{Array, Dict, Iter, RefArg, Variant};
 use ascii::AsciiStr;
 
 use errors::*;
-use dbus_api::{extract, path_to_string, DBusApi, VariantTo, variant_iter_to_vec_u8};
+use dbus_api::{extract, path_to_string, DBusApi, variant_iter_to_vec_u8};
 use manager::{Connectivity, NetworkManagerState};
 use connection::{ConnectionSettings, ConnectionState};
 use ssid::{AsSsidSlice, Ssid};
 use device::{DeviceState, DeviceType};
 use wifi::{AccessPoint, AccessPointCredentials, NM80211ApFlags, NM80211ApSecurityFlags};
+
+use eui48::MacAddress;
 
 type VariantMap = HashMap<String, Variant<Box<RefArg>>>;
 
@@ -90,21 +92,22 @@ impl DBusNetworkManager {
     pub fn get_active_connections(&self) -> Result<Vec<String>> {
         self.dbus
             .property(NM_SERVICE_PATH, NM_SERVICE_INTERFACE, "ActiveConnections")
+            .and_then(|connections: Vec<Path>| {
+                let mut result = Vec::new();
+                connections.iter().try_for_each(|c| path_to_string(&c).map(|p| result.push(p)))?;
+                Ok(result)
+            })
     }
 
     pub fn get_active_connection_path(&self, path: &str) -> Option<String> {
         self.dbus
             .property(path, NM_ACTIVE_INTERFACE, "Connection")
+            .and_then(|c| path_to_string(&c))
             .ok()
     }
 
     pub fn get_connection_state(&self, path: &str) -> Result<ConnectionState> {
-        let state: i64 = match self.dbus.property(path, NM_ACTIVE_INTERFACE, "State") {
-            Ok(state) => state,
-            Err(_) => return Ok(ConnectionState::Unknown),
-        };
-
-        Ok(ConnectionState::from(state))
+        self.dbus.property(path, NM_ACTIVE_INTERFACE, "State")
     }
 
     pub fn get_connection_settings(&self, path: &str) -> Result<ConnectionSettings> {
@@ -118,6 +121,7 @@ impl DBusNetworkManager {
         let mut uuid = String::new();
         let mut ssid = Ssid::new();
         let mut mode = String::new();
+        let mut mac_address = String::new();
 
         for (_, v1) in dict {
             for (k2, mut v2) in v1 {
@@ -137,18 +141,66 @@ impl DBusNetworkManager {
                     "mode" => {
                         mode = extract::<String>(&mut v2)?;
                     },
+                    "mac-address" => {
+                        mac_address =
+                            MacAddress::from_bytes(&variant_iter_to_vec_u8(&mut v2)?)
+                                .expect("Network manager mac address has always the correct length.")
+                                .to_hex_string();
+                    },
                     _ => {},
                 }
             }
         }
 
         Ok(ConnectionSettings {
-            kind: kind,
-            id: id,
-            uuid: uuid,
-            ssid: ssid,
-            mode: mode,
+            kind,
+            id,
+            uuid,
+            ssid,
+            mode,
+            mac_address
         })
+    }
+
+    fn get_secrets(&self, path: &str, setting_name: &str, secrets: &mut HashMap<String, VariantMap>) -> Result<()> {
+        let secrets_response = self.dbus.call_with_args(
+            path,
+            NM_CONNECTION_INTERFACE,
+            "GetSecrets",
+            &[ &setting_name.to_string() as &RefArg ],
+        )?;
+        let sub_secrets: HashMap<String, VariantMap> = self.dbus.extract(&secrets_response)?;
+        secrets.extend(sub_secrets.into_iter());
+        Ok(())
+    }
+
+    pub fn set_connection_mac_address(&self, path: &str, mac_address: &str) -> Result<()> {
+        let response = self.dbus.call(path, NM_CONNECTION_INTERFACE, "GetSettings")?;
+        let mut settings: HashMap<String, VariantMap> = self.dbus.extract(&response)?;
+
+        let mut secrets: HashMap<String, VariantMap> = HashMap::default();
+
+        for setting_name in &["802-11-wireless", "802-11-wireless-security", "802-1x"] {
+            // If a secret was not found for a given `setting_name`, ignore it.
+            self.get_secrets(path, setting_name, &mut secrets).ok();
+        }
+
+        let mac_address = MacAddress::parse_str(mac_address).map_err(|e| ErrorKind::DBusAPI(format!("{:?}", e)))?;
+
+        add_val(
+            settings.entry("802-11-wireless".into()).or_default(),
+            "mac-address",
+            mac_address.as_bytes().to_vec(),
+        );
+
+        secrets.into_iter().for_each(|(k, v)| settings.entry(k).or_default().extend(v.into_iter()));
+
+        self.dbus.call_with_args(
+            path,
+            NM_CONNECTION_INTERFACE,
+            "Update",
+            &[ &settings as &RefArg ],
+        ).map(|_| ())
     }
 
     pub fn get_active_connection_devices(&self, path: &str) -> Result<Vec<String>> {
@@ -195,11 +247,19 @@ impl DBusNetworkManager {
     ) -> Result<(String, String)> {
         let mut settings: HashMap<String, VariantMap> = HashMap::new();
 
+        let mac_address = self.get_wifi_device_perm_hw_address(device_path)?;
+        let mac_address = MacAddress::parse_str(&mac_address).map_err(|e| ErrorKind::DBusAPI(format!("{:?}", e)))?;
+
         let mut wireless: VariantMap = HashMap::new();
         add_val(
             &mut wireless,
             "ssid",
             access_point.ssid().as_bytes().to_vec(),
+        );
+        add_val(
+            &mut wireless,
+            "mac-address",
+            mac_address.as_bytes().to_vec(),
         );
         settings.insert("802-11-wireless".to_string(), wireless);
 
@@ -350,6 +410,11 @@ impl DBusNetworkManager {
     pub fn get_devices(&self) -> Result<Vec<String>> {
         self.dbus
             .property(NM_SERVICE_PATH, NM_SERVICE_INTERFACE, "Devices")
+            .and_then(|connections: Vec<Path>| {
+                let mut result = Vec::new();
+                connections.iter().try_for_each(|c| path_to_string(&c).map(|p| result.push(p)))?;
+                Ok(result)
+            })
     }
 
     pub fn get_device_by_interface(&self, interface: &str) -> Result<String> {
@@ -375,6 +440,10 @@ impl DBusNetworkManager {
 
     pub fn get_device_state(&self, path: &str) -> Result<DeviceState> {
         self.dbus.property(path, NM_DEVICE_INTERFACE, "State")
+    }
+
+    pub fn get_wifi_device_perm_hw_address(&self, path: &str) -> Result<String> {
+        self.dbus.property(path, NM_WIRELESS_INTERFACE, "PermHwAddress")
     }
 
     pub fn connect_device(&self, path: &str) -> Result<()> {
@@ -411,8 +480,7 @@ impl DBusNetworkManager {
     }
 
     pub fn get_device_access_points(&self, path: &str) -> Result<Vec<String>> {
-        self.dbus
-            .property(path, NM_WIRELESS_INTERFACE, "AccessPoints")
+        self.dbus.property(path, NM_WIRELESS_INTERFACE, "AccessPoints")
     }
 
     pub fn get_access_point_ssid(&self, path: &str) -> Option<Ssid> {
@@ -442,36 +510,6 @@ impl DBusNetworkManager {
     pub fn get_access_point_rsn_flags(&self, path: &str) -> Result<NM80211ApSecurityFlags> {
         self.dbus
             .property(path, NM_ACCESS_POINT_INTERFACE, "RsnFlags")
-    }
-}
-
-impl VariantTo<DeviceType> for DBusApi {
-    fn variant_to(value: &Variant<Box<RefArg>>) -> Option<DeviceType> {
-        value.0.as_i64().map(DeviceType::from)
-    }
-}
-
-impl VariantTo<DeviceState> for DBusApi {
-    fn variant_to(value: &Variant<Box<RefArg>>) -> Option<DeviceState> {
-        value.0.as_i64().map(DeviceState::from)
-    }
-}
-
-impl VariantTo<NM80211ApFlags> for DBusApi {
-    fn variant_to(value: &Variant<Box<RefArg>>) -> Option<NM80211ApFlags> {
-        value
-            .0
-            .as_i64()
-            .and_then(|v| NM80211ApFlags::from_bits(v as u32))
-    }
-}
-
-impl VariantTo<NM80211ApSecurityFlags> for DBusApi {
-    fn variant_to(value: &Variant<Box<RefArg>>) -> Option<NM80211ApSecurityFlags> {
-        value
-            .0
-            .as_i64()
-            .and_then(|v| NM80211ApSecurityFlags::from_bits(v as u32))
     }
 }
 

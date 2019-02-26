@@ -10,13 +10,14 @@ categories = ["api-bindings", "network-programming", "os::unix-apis"]
 license = "Apache-2.0"
 
 [dependencies]
-dbus = "0.5"
+dbus = "0.6"
 futures = "0.1"
 futures-cpupool = "0.1"
 tokio-timer = "0.1"
 bitflags = "1.0"
 ascii = "0.8"
 log = "0.3"
+eui48 = "0.4"
 
 [dependencies.error-chain]
 version = "0.11"

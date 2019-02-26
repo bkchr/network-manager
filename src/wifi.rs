@@ -94,6 +94,10 @@ impl WiFiDevice {
             address,
         )
     }
+
+    pub fn perm_hw_address(&self) -> Result<String> {
+        self.dbus_manager.get_wifi_device_perm_hw_address(self.device.path())
+    }
 }
 
 impl Deref for WiFiDevice {
@@ -158,6 +162,12 @@ bitflags! {
     }
 }
 
+impl<'b> dbus::arg::Get<'b> for NM80211ApFlags {
+    fn get(i: &mut dbus::arg::Iter<'b>) -> Option<Self> {
+        i.get::<u32>().and_then(|v| NM80211ApFlags::from_bits(v))
+    }
+}
+
 bitflags! {
     pub struct NM80211ApSecurityFlags: u32 {
          // the access point has no special security requirements
@@ -182,6 +192,12 @@ bitflags! {
         const AP_SEC_KEY_MGMT_PSK            = 0x0000_0100;
         // 802.1x authentication and key management is supported
         const AP_SEC_KEY_MGMT_802_1X         = 0x0000_0200;
+    }
+}
+
+impl<'b> dbus::arg::Get<'b> for NM80211ApSecurityFlags {
+    fn get(i: &mut dbus::arg::Iter<'b>) -> Option<Self> {
+        i.get::<u32>().and_then(|v| NM80211ApSecurityFlags::from_bits(v))
     }
 }
 

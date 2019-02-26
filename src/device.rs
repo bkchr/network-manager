@@ -152,8 +152,8 @@ pub enum DeviceType {
     Dummy,
 }
 
-impl From<i64> for DeviceType {
-    fn from(device_type: i64) -> Self {
+impl From<u32> for DeviceType {
+    fn from(device_type: u32) -> Self {
         match device_type {
             0 => DeviceType::Unknown,
             1 => DeviceType::Ethernet,
@@ -186,6 +186,12 @@ impl From<i64> for DeviceType {
     }
 }
 
+impl<'b> dbus::arg::Get<'b> for DeviceType {
+    fn get(i: &mut dbus::arg::Iter<'b>) -> Option<Self> {
+        i.read::<u32>().map(|v| DeviceType::from(v)).ok()
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum DeviceState {
     Unknown,
@@ -203,8 +209,8 @@ pub enum DeviceState {
     Failed,
 }
 
-impl From<i64> for DeviceState {
-    fn from(state: i64) -> Self {
+impl From<u32> for DeviceState {
+    fn from(state: u32) -> Self {
         match state {
             0 => DeviceState::Unknown,
             10 => DeviceState::Unmanaged,
@@ -224,6 +230,12 @@ impl From<i64> for DeviceState {
                 DeviceState::Unknown
             },
         }
+    }
+}
+
+impl<'b> dbus::arg::Get<'b> for DeviceState {
+    fn get(i: &mut dbus::arg::Iter<'b>) -> Option<Self> {
+        i.read::<u32>().map(|v| DeviceState::from(v)).ok()
     }
 }
 
