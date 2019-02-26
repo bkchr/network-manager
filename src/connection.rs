@@ -1,13 +1,13 @@
-use std::rc::Rc;
 use std::fmt;
 use std::net::Ipv4Addr;
+use std::rc::Rc;
 
-use errors::*;
 use dbus_nm::DBusNetworkManager;
+use errors::*;
 
-use wifi::{AccessPoint, AccessPointCredentials};
 use device::{get_active_connection_devices, Device};
 use ssid::{AsSsidSlice, Ssid};
+use wifi::{AccessPoint, AccessPointCredentials};
 
 #[derive(Clone)]
 pub struct Connection {
@@ -135,7 +135,8 @@ impl Connection {
     }
 
     pub fn set_mac_address(&self, mac_address: &str) -> Result<()> {
-        self.dbus_manager.set_connection_mac_address(&self.path, mac_address)
+        self.dbus_manager
+            .set_connection_mac_address(&self.path, mac_address)
     }
 }
 
@@ -382,7 +383,6 @@ mod tests {
             ),
         };
 
-println!("{:?}", connection.settings());
         let state = connection.get_state().unwrap();
 
         if state == ConnectionState::Activated {

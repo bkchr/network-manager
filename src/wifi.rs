@@ -1,9 +1,9 @@
-use std::rc::Rc;
 use std::net::Ipv4Addr;
 use std::ops::Deref;
+use std::rc::Rc;
 
-use errors::*;
 use dbus_nm::DBusNetworkManager;
+use errors::*;
 
 use connection::{connect_to_access_point, create_hotspot, Connection, ConnectionState};
 use device::{Device, PathGetter};
@@ -15,10 +15,7 @@ pub struct WiFiDevice {
 }
 
 impl WiFiDevice {
-    pub(crate) fn new(
-        dbus_manager: Rc<DBusNetworkManager>,
-        device: Device,
-    ) -> WiFiDevice {
+    pub(crate) fn new(dbus_manager: Rc<DBusNetworkManager>, device: Device) -> WiFiDevice {
         WiFiDevice {
             dbus_manager,
             device,
@@ -42,7 +39,8 @@ impl WiFiDevice {
     pub fn get_access_points(&self) -> Result<Vec<AccessPoint>> {
         let mut access_points = Vec::new();
 
-        let paths = self.dbus_manager
+        let paths = self
+            .dbus_manager
             .get_device_access_points(self.device.path())?;
 
         for path in paths {
@@ -96,7 +94,8 @@ impl WiFiDevice {
     }
 
     pub fn perm_hw_address(&self) -> Result<String> {
-        self.dbus_manager.get_wifi_device_perm_hw_address(self.device.path())
+        self.dbus_manager
+            .get_wifi_device_perm_hw_address(self.device.path())
     }
 }
 
@@ -197,7 +196,8 @@ bitflags! {
 
 impl<'b> dbus::arg::Get<'b> for NM80211ApSecurityFlags {
     fn get(i: &mut dbus::arg::Iter<'b>) -> Option<Self> {
-        i.get::<u32>().and_then(|v| NM80211ApSecurityFlags::from_bits(v))
+        i.get::<u32>()
+            .and_then(|v| NM80211ApSecurityFlags::from_bits(v))
     }
 }
 

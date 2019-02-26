@@ -20,18 +20,18 @@ extern crate eui48;
 
 pub mod errors;
 
-mod dbus_nm;
+mod connection;
 mod dbus_api;
+mod dbus_nm;
+mod device;
 mod manager;
 mod service;
-mod connection;
-mod device;
-mod wifi;
 mod ssid;
+mod wifi;
 
-pub use manager::{Connectivity, NetworkManager};
 pub use connection::{Connection, ConnectionSettings, ConnectionState};
 pub use device::{Device, DeviceState, DeviceType};
-pub use wifi::{AccessPoint, AccessPointCredentials, Security, WiFiDevice};
+pub use manager::{Connectivity, NetworkManager};
 pub use service::ServiceState;
 pub use ssid::{Ssid, SsidSlice};
+pub use wifi::{AccessPoint, AccessPointCredentials, Security, WiFiDevice};

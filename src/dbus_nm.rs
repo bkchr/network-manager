@@ -1,17 +1,17 @@
 use std::collections::HashMap;
 use std::net::Ipv4Addr;
 
-use dbus::Path;
 use dbus::arg::{Array, Dict, Iter, RefArg, Variant};
+use dbus::Path;
 
 use ascii::AsciiStr;
 
-use errors::*;
-use dbus_api::{extract, path_to_string, DBusApi, variant_iter_to_vec_u8};
-use manager::{Connectivity, NetworkManagerState};
 use connection::{ConnectionSettings, ConnectionState};
-use ssid::{AsSsidSlice, Ssid};
+use dbus_api::{extract, path_to_string, variant_iter_to_vec_u8, DBusApi};
 use device::{DeviceState, DeviceType};
+use errors::*;
+use manager::{Connectivity, NetworkManagerState};
+use ssid::{AsSsidSlice, Ssid};
 use wifi::{AccessPoint, AccessPointCredentials, NM80211ApFlags, NM80211ApSecurityFlags};
 
 use eui48::MacAddress;
@@ -53,7 +53,8 @@ impl DBusNetworkManager {
     }
 
     pub fn get_state(&self) -> Result<NetworkManagerState> {
-        let response = self.dbus
+        let response = self
+            .dbus
             .call(NM_SERVICE_PATH, NM_SERVICE_INTERFACE, "state")?;
 
         let state: u32 = self.dbus.extract(&response)?;
@@ -62,8 +63,9 @@ impl DBusNetworkManager {
     }
 
     pub fn check_connectivity(&self) -> Result<Connectivity> {
-        let response = self.dbus
-            .call(NM_SERVICE_PATH, NM_SERVICE_INTERFACE, "CheckConnectivity")?;
+        let response =
+            self.dbus
+                .call(NM_SERVICE_PATH, NM_SERVICE_INTERFACE, "CheckConnectivity")?;
 
         let connectivity: u32 = self.dbus.extract(&response)?;
 
@@ -81,8 +83,9 @@ impl DBusNetworkManager {
     }
 
     pub fn list_connections(&self) -> Result<Vec<String>> {
-        let response = self.dbus
-            .call(NM_SETTINGS_PATH, NM_SETTINGS_INTERFACE, "ListConnections")?;
+        let response =
+            self.dbus
+                .call(NM_SETTINGS_PATH, NM_SETTINGS_INTERFACE, "ListConnections")?;
 
         let array: Array<Path, _> = self.dbus.extract(&response)?;
 
@@ -94,7 +97,9 @@ impl DBusNetworkManager {
             .property(NM_SERVICE_PATH, NM_SERVICE_INTERFACE, "ActiveConnections")
             .and_then(|connections: Vec<Path>| {
                 let mut result = Vec::new();
-                connections.iter().try_for_each(|c| path_to_string(&c).map(|p| result.push(p)))?;
+                connections
+                    .iter()
+                    .try_for_each(|c| path_to_string(&c).map(|p| result.push(p)))?;
                 Ok(result)
             })
     }
@@ -111,7 +116,8 @@ impl DBusNetworkManager {
     }
 
     pub fn get_connection_settings(&self, path: &str) -> Result<ConnectionSettings> {
-        let response = self.dbus
+        let response = self
+            .dbus
             .call(path, NM_CONNECTION_INTERFACE, "GetSettings")?;
 
         let dict: Dict<&str, Dict<&str, Variant<Iter>, _>, _> = self.dbus.extract(&response)?;
@@ -142,10 +148,9 @@ impl DBusNetworkManager {
                         mode = extract::<String>(&mut v2)?;
                     },
                     "mac-address" => {
-                        mac_address =
-                            MacAddress::from_bytes(&variant_iter_to_vec_u8(&mut v2)?)
-                                .expect("Network manager mac address has always the correct length.")
-                                .to_hex_string();
+                        mac_address = MacAddress::from_bytes(&variant_iter_to_vec_u8(&mut v2)?)
+                            .expect("Network manager mac address has always the correct length.")
+                            .to_hex_string();
                     },
                     _ => {},
                 }
@@ -158,16 +163,21 @@ impl DBusNetworkManager {
             uuid,
             ssid,
             mode,
-            mac_address
+            mac_address,
         })
     }
 
-    fn get_secrets(&self, path: &str, setting_name: &str, secrets: &mut HashMap<String, VariantMap>) -> Result<()> {
+    fn get_secrets(
+        &self,
+        path: &str,
+        setting_name: &str,
+        secrets: &mut HashMap<String, VariantMap>,
+    ) -> Result<()> {
         let secrets_response = self.dbus.call_with_args(
             path,
             NM_CONNECTION_INTERFACE,
             "GetSecrets",
-            &[ &setting_name.to_string() as &RefArg ],
+            &[&setting_name.to_string() as &RefArg],
         )?;
         let sub_secrets: HashMap<String, VariantMap> = self.dbus.extract(&secrets_response)?;
         secrets.extend(sub_secrets.into_iter());
@@ -175,7 +185,9 @@ impl DBusNetworkManager {
     }
 
     pub fn set_connection_mac_address(&self, path: &str, mac_address: &str) -> Result<()> {
-        let response = self.dbus.call(path, NM_CONNECTION_INTERFACE, "GetSettings")?;
+        let response = self
+            .dbus
+            .call(path, NM_CONNECTION_INTERFACE, "GetSettings")?;
         let mut settings: HashMap<String, VariantMap> = self.dbus.extract(&response)?;
 
         let mut secrets: HashMap<String, VariantMap> = HashMap::default();
@@ -185,7 +197,8 @@ impl DBusNetworkManager {
             self.get_secrets(path, setting_name, &mut secrets).ok();
         }
 
-        let mac_address = MacAddress::parse_str(mac_address).map_err(|e| ErrorKind::DBusAPI(format!("{:?}", e)))?;
+        let mac_address = MacAddress::parse_str(mac_address)
+            .map_err(|e| ErrorKind::DBusAPI(format!("{:?}", e)))?;
 
         add_val(
             settings.entry("802-11-wireless".into()).or_default(),
@@ -193,14 +206,18 @@ impl DBusNetworkManager {
             mac_address.as_bytes().to_vec(),
         );
 
-        secrets.into_iter().for_each(|(k, v)| settings.entry(k).or_default().extend(v.into_iter()));
+        secrets
+            .into_iter()
+            .for_each(|(k, v)| settings.entry(k).or_default().extend(v.into_iter()));
 
-        self.dbus.call_with_args(
-            path,
-            NM_CONNECTION_INTERFACE,
-            "Update",
-            &[ &settings as &RefArg ],
-        ).map(|_| ())
+        self.dbus
+            .call_with_args(
+                path,
+                NM_CONNECTION_INTERFACE,
+                "Update",
+                &[&settings as &RefArg],
+            )
+            .map(|_| ())
     }
 
     pub fn get_active_connection_devices(&self, path: &str) -> Result<Vec<String>> {
@@ -248,7 +265,8 @@ impl DBusNetworkManager {
         let mut settings: HashMap<String, VariantMap> = HashMap::new();
 
         let mac_address = self.get_wifi_device_perm_hw_address(device_path)?;
-        let mac_address = MacAddress::parse_str(&mac_address).map_err(|e| ErrorKind::DBusAPI(format!("{:?}", e)))?;
+        let mac_address = MacAddress::parse_str(&mac_address)
+            .map_err(|e| ErrorKind::DBusAPI(format!("{:?}", e)))?;
 
         let mut wireless: VariantMap = HashMap::new();
         add_val(
@@ -412,7 +430,9 @@ impl DBusNetworkManager {
             .property(NM_SERVICE_PATH, NM_SERVICE_INTERFACE, "Devices")
             .and_then(|connections: Vec<Path>| {
                 let mut result = Vec::new();
-                connections.iter().try_for_each(|c| path_to_string(&c).map(|p| result.push(p)))?;
+                connections
+                    .iter()
+                    .try_for_each(|c| path_to_string(&c).map(|p| result.push(p)))?;
                 Ok(result)
             })
     }
@@ -443,7 +463,8 @@ impl DBusNetworkManager {
     }
 
     pub fn get_wifi_device_perm_hw_address(&self, path: &str) -> Result<String> {
-        self.dbus.property(path, NM_WIRELESS_INTERFACE, "PermHwAddress")
+        self.dbus
+            .property(path, NM_WIRELESS_INTERFACE, "PermHwAddress")
     }
 
     pub fn connect_device(&self, path: &str) -> Result<()> {
@@ -480,11 +501,13 @@ impl DBusNetworkManager {
     }
 
     pub fn get_device_access_points(&self, path: &str) -> Result<Vec<String>> {
-        self.dbus.property(path, NM_WIRELESS_INTERFACE, "AccessPoints")
+        self.dbus
+            .property(path, NM_WIRELESS_INTERFACE, "AccessPoints")
     }
 
     pub fn get_access_point_ssid(&self, path: &str) -> Option<Ssid> {
-        if let Ok(ssid_vec) = self.dbus
+        if let Ok(ssid_vec) = self
+            .dbus
             .property::<Vec<u8>>(path, NM_ACCESS_POINT_INTERFACE, "Ssid")
         {
             Ssid::from_bytes(ssid_vec).ok()

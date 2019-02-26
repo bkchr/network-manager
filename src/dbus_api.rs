@@ -1,7 +1,7 @@
-use dbus::Connection as DBusConnection;
-use dbus::{BusType, ConnPath, Message, Path};
 use dbus::arg::{Array, Get, Iter, RefArg, Variant};
 use dbus::stdintf::OrgFreedesktopDBusProperties;
+use dbus::Connection as DBusConnection;
+use dbus::{BusType, ConnPath, Message, Path};
 
 use errors::*;
 
@@ -108,7 +108,8 @@ impl DBusApi {
     }
 
     fn send_message_checked(&self, message: Message) -> Option<Result<Message>> {
-        match self.connection
+        match self
+            .connection
             .send_with_reply_and_block(message, self.method_timeout as i32 * 1000)
         {
             Ok(response) => Some(Ok(response)),
@@ -130,7 +131,8 @@ impl DBusApi {
     }
 
     pub fn property<T>(&self, path: &str, interface: &str, name: &str) -> Result<T>
-        where for<'b> T: dbus::arg::Get<'b>,
+    where
+        for<'b> T: dbus::arg::Get<'b>,
     {
         let property_error = |details: &str, err: bool| {
             let message = format!(
