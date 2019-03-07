@@ -197,7 +197,7 @@ bitflags! {
 impl<'b> dbus::arg::Get<'b> for NM80211ApSecurityFlags {
     fn get(i: &mut dbus::arg::Iter<'b>) -> Option<Self> {
         i.get::<u32>()
-            .and_then(|v| NM80211ApSecurityFlags::from_bits(v))
+            .and_then(NM80211ApSecurityFlags::from_bits)
     }
 }
 
@@ -209,9 +209,9 @@ fn get_access_point(manager: &DBusNetworkManager, path: &str) -> Result<Option<A
 
         let access_point = AccessPoint {
             path: path.to_string(),
-            ssid: ssid,
-            strength: strength,
-            security: security,
+            ssid,
+            strength,
+            security,
         };
 
         Ok(Some(access_point))

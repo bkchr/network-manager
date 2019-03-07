@@ -23,8 +23,8 @@ impl Device {
         Ok(Device {
             dbus_manager: Rc::clone(dbus_manager),
             path: path.to_string(),
-            interface: interface,
-            device_type: device_type,
+            interface,
+            device_type,
         })
     }
 

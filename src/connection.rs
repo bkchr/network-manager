@@ -23,7 +23,7 @@ impl Connection {
         Ok(Connection {
             dbus_manager: Rc::clone(dbus_manager),
             path: path.to_string(),
-            settings: settings,
+            settings,
         })
     }
 

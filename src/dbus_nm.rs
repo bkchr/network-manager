@@ -503,6 +503,13 @@ impl DBusNetworkManager {
     pub fn get_device_access_points(&self, path: &str) -> Result<Vec<String>> {
         self.dbus
             .property(path, NM_WIRELESS_INTERFACE, "AccessPoints")
+            .and_then(|access_points: Vec<Path>| {
+                let mut result = Vec::new();
+                access_points
+                    .iter()
+                    .try_for_each(|c| path_to_string(&c).map(|p| result.push(p)))?;
+                Ok(result)
+            })
     }
 
     pub fn get_access_point_ssid(&self, path: &str) -> Option<Ssid> {
@@ -519,6 +526,10 @@ impl DBusNetworkManager {
     pub fn get_access_point_strength(&self, path: &str) -> Result<u32> {
         self.dbus
             .property(path, NM_ACCESS_POINT_INTERFACE, "Strength")
+            .and_then(|s: dbus::MessageItem| match s {
+                dbus::MessageItem::Byte(val) => Ok(val as u32),
+                _ => Err(ErrorKind::DBusAPI("Error reading `Strength`".into()).into()),
+            })
     }
 
     pub fn get_access_point_flags(&self, path: &str) -> Result<NM80211ApFlags> {
