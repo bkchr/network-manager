@@ -150,7 +150,8 @@ impl DBusNetworkManager {
                     "mac-address" => {
                         mac_address = MacAddress::from_bytes(&variant_iter_to_vec_u8(&mut v2)?)
                             .expect("Network manager mac address has always the correct length.")
-                            .to_hex_string();
+                            .to_hex_string()
+                            .to_uppercase();
                     },
                     _ => {},
                 }

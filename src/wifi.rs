@@ -95,7 +95,7 @@ impl WiFiDevice {
 
     pub fn perm_hw_address(&self) -> Result<String> {
         self.dbus_manager
-            .get_wifi_device_perm_hw_address(self.device.path())
+            .get_wifi_device_perm_hw_address(self.device.path()).map(|s| s.to_uppercase())
     }
 }
 
