@@ -107,7 +107,7 @@ impl Deref for WiFiDevice {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AccessPoint {
     pub path: String,
     pub ssid: Ssid,
