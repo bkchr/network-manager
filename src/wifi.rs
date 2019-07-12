@@ -9,6 +9,7 @@ use connection::{connect_to_access_point, create_hotspot, Connection, Connection
 use device::{Device, PathGetter};
 use ssid::{AsSsidSlice, Ssid, SsidSlice};
 
+#[derive(Clone)]
 pub struct WiFiDevice {
     dbus_manager: Rc<DBusNetworkManager>,
     device: Device,
